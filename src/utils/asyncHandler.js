@@ -1,9 +1,9 @@
 
 // requsterhandler is function which will exucate 
 const asyncHandler = (requsteHandler) => {
-    (req, res, next) => {
+    return (req, res, next) => {
         Promise.resolve(requsteHandler(req, res, next))
-        .catch((error) => next(error))
+        .catch((error) => next(error))  
     }
 };
 

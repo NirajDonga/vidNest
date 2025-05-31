@@ -1,3 +1,5 @@
+// we manually add statusCode, data, success, errorsso that it become easy to debug
+
 class ApiError extends Error {
     constructor(
         statusCode,
