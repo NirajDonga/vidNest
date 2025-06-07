@@ -1,11 +1,15 @@
 import {v2 as cloudinary} from "cloudinary";
 import fs from "fs"; // file system
 
+import dotenv from "dotenv";
+dotenv.config();
+
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME, 
     api_key: process.env.CLOUDINARY_API_KEY, 
     api_secret: process.env.CLOUDINARY_API_SECRET
 });
+// console.log(cloud_name);
 
 const uploadOnCloudinary = async (localFilePath) => {
     try {
@@ -16,12 +20,12 @@ const uploadOnCloudinary = async (localFilePath) => {
             resource_type: "auto"
         });
 
-        // fs.unlinkSync(localFilePath);
-        console.log("file uploaded on cloudinary", response.url);
+        fs.unlinkSync(localFilePath);
         return response;
 
     } catch (error) {
-        fs.unlinkSync(localFilePath); // remove the locaaly save temparary files
+        console.error("Error during cloudinary upload:", error);
+        fs.unlinkSync(localFilePath); // remove the locally saved temporary files
         return null;
     }
 }
