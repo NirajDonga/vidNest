@@ -4,7 +4,6 @@ import { User } from "../models/user.model.js";
 import { uploadOnCloudinary, deleteFromCloudinary } from "../utils/cloudnary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import jwt from "jsonwebtoken";
-import mongoose from "mongoose";
 
 const generateAccessAndRefreshTokens = async(userId) => {
     try{
@@ -370,7 +369,7 @@ const getUserChannelProfile = asyncHandler(async(req, res) => {
                 },
                 isSubscribed: {
                     $cond: {
-                        if: {$in: [req.user._id, "$subsribers.subscriber"]},
+                        if: {$in: [req.user._id, "$subscribers.subscriber"]},
                         then: true,
                         else: false
                     }
@@ -406,7 +405,7 @@ const getWatchHistory = asyncHandler(async(req, res) => {
         },
         {
             $lookup: {
-                from: "video",
+                from: "videos",
                 localField: "watchHistory",
                 foreignField: "_id",
                 as: "watchHistory",
@@ -422,14 +421,13 @@ const getWatchHistory = asyncHandler(async(req, res) => {
                                     $project: {
                                         fullname: 1,
                                         username: 1,
-                                        avatar:1
+                                        avatar: 1
                                     }
                                 }
                             ]
                         }
                     },
                     {
-                        // making object from array.
                         $addFields: {
                             owner: {
                                 $first: "$owner"
@@ -439,9 +437,17 @@ const getWatchHistory = asyncHandler(async(req, res) => {
                 ]
             }
         }
-    ]);
-    return res.status(200)
-        .json(new ApiResponse(200, user[0].watchHistory, "Watch History Fetched Successfully"));
+    ])
+
+    return res
+    .status(200)
+    .json(
+        new ApiResponse(
+            200,
+            user[0].watchHistory,
+            "Watch history fetched successfully"
+        )
+    )
 });
 
 export { 
