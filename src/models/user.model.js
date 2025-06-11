@@ -59,7 +59,7 @@ userSchema.pre("save", async function(next) {
 });
 userSchema.methods.isPasswordCorrect = async function(password) {
     return await bcrypt.compare(password, this.password);
-}
+};
 
 userSchema.methods.generateAccessToken = function() {
     if (!process.env.ACCESS_TOKEN_SECRET) {
@@ -77,7 +77,7 @@ userSchema.methods.generateAccessToken = function() {
             expiresIn: ACCESS_TOKEN_EXPIRY
         }
     )
-}
+};
 userSchema.methods.generateRefreshToken = function() {
     if (!process.env.REFRESH_TOKEN_SECRET) {
         throw new Error("REFRESH_TOKEN_SECRET is not defined in environment variables");
@@ -91,6 +91,6 @@ userSchema.methods.generateRefreshToken = function() {
             expiresIn: REFRESH_TOKEN_EXPIRY
         }
     )
-}
+};
 
 export const User = mongoose.model("User", userSchema);

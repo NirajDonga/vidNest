@@ -4,12 +4,13 @@ import { User } from "../models/user.model.js";
 import { uploadOnCloudinary, deleteFromCloudinary } from "../utils/cloudnary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import jwt from "jsonwebtoken";
+import mongoose from "mongoose";
 
 const generateAccessAndRefreshTokens = async(userId) => {
     try{
         const user = await User.findById(userId);
-        const accessToken = await User.generateAccessToken();
-        const refreshToken = await User.generateRefreshToken();
+        const accessToken = await user.generateAccessToken();
+        const refreshToken = await user.generateRefreshToken();
         user.refreshToken = refreshToken;
         await user.save({ validateBeforeSave: false });
 
@@ -100,7 +101,7 @@ const loginUser = asyncHandler(async(req, res) => {
     }
     
     // find user
-    // dont have to check firther because username and email both are unique.
+    // dont have to check further because username and email both are unique.
     const user = await User.findOne({
         $or: [{username}, {email}]
     });
@@ -109,7 +110,7 @@ const loginUser = asyncHandler(async(req, res) => {
     }
     
     // password check
-    const isPasswordValid = await User.isPasswordCorrect(password);
+    const isPasswordValid = await user.isPasswordCorrect(password);
     if(!isPasswordValid) {
         throw new ApiError(401, "Incorrect Password");
     }
@@ -145,8 +146,8 @@ const logoutUser = asyncHandler(async(req, res) => {
     await User.findByIdAndUpdate(
         req.user._id,
         {
-            $set: {
-                refreshToken: undefined
+            $unset: {
+                refreshToken: 1
             }
         },
         {
@@ -210,9 +211,9 @@ const refreshAccessToken = asyncHandler(async(req, res) => {
 const changeCurrentPassword = asyncHandler(async(req, res) => {
     const {oldPassword, newPassword} = req.body;
 
-    const user = User.findById(req.user?._id)
+    const user = await User.findById(req.user?._id)
     
-    const isPasswordCorrect = user.isPasswordCorrect(oldPassword)
+    const isPasswordCorrect = await user.isPasswordCorrect(oldPassword)
 
     if(!isPasswordCorrect) {
         throw new ApiError(400, "Invalid Passsword");
@@ -229,7 +230,7 @@ const changeCurrentPassword = asyncHandler(async(req, res) => {
 const getCurrentUser = asyncHandler(async(req, res) => {
     return res
     .status(200)
-    .json(200, req.user, "Current USer fetched Successfully");
+    .json(new ApiResponse(200, req.user, "Current USer fetched Successfully"));
 });
 
 const updateAccountDetails = asyncHandler(async(req, res) => {
@@ -243,14 +244,14 @@ const updateAccountDetails = asyncHandler(async(req, res) => {
     if (fullname) updates.fullname = fullname;
     if (email) updates.email = email;
 
-    User.findByIdAndUpdate(
+    const user = await User.findByIdAndUpdate(
         req.user?._id,  
         { $set: updates },
         { new:true }
     ).select("-password");
 
     return res.status(200)
-    .json(new ApiResponse(200, user, "Account details updated Successfully")); 
+    .json(new ApiResponse(200, user, "Account details updated Successfully"));
 
 });
 
@@ -330,6 +331,28 @@ const updateUserCoverImage = asyncHandler(async(req, res) => {
     .json(new ApiResponse(200, updatedUser, "Cover image updated successfully")); 
 });
 
+const removeCoverImage = asyncHandler(async(req, res) => {
+
+    const oldUser = await User.findByIdAndUpdate(
+        req.user.id,
+        {
+            $unset: {
+                coverImage: 1
+            }
+        },
+        {new: false}
+    );
+
+    if(oldUser) {
+        const oldCoverImageUrl = oldUser.coverImage;
+        if (oldCoverImageUrl) {
+            await deleteFromCloudinary(oldCoverImageUrl);
+        }
+    }
+    return res.status(200)
+        .json(new ApiResponse(200, "Cover image removed successfully"));
+});
+
 const getUserChannelProfile = asyncHandler(async(req, res) => {
     const {username} = req.params;
     if(!username?.trim) {
@@ -348,7 +371,7 @@ const getUserChannelProfile = asyncHandler(async(req, res) => {
                 from: "subscription",
                 localField: "_id",
                 foreignField: "channel",
-                as: "subsribers"
+                as: "subscribers"
             }
         },
         {
@@ -356,7 +379,7 @@ const getUserChannelProfile = asyncHandler(async(req, res) => {
                 from: "subscription",
                 localField: "_id",
                 foreignField: "subscriber",
-                as: "subsribedTo"
+                as: "subscribedTo"
             }
         },
         {
@@ -437,7 +460,7 @@ const getWatchHistory = asyncHandler(async(req, res) => {
                 ]
             }
         }
-    ])
+    ]);
 
     return res
     .status(200)
@@ -460,6 +483,7 @@ export {
     updateAccountDetails,
     updateUserAvatar,
     updateUserCoverImage,
+    removeCoverImage,
     getUserChannelProfile,
     getWatchHistory
  };
