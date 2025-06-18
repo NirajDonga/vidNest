@@ -1,19 +1,21 @@
-import mongoose, {isValidObjectId} from "mongoose"
-import {Video} from "../models/video.model.js"
-import {User} from "../models/user.model.js"
-import {ApiError} from "../utils/ApiError.js"
-import {ApiResponse} from "../utils/ApiResponse.js"
-import {asyncHandler} from "../utils/asyncHandler.js"
-import {uploadOnCloudinary} from "../utils/cloudinary.js"
+import mongoose, {isValidObjectId} from "mongoose";
+import {Video} from "../models/video.model.js";
+import {User} from "../models/user.model.js";
+import {Like} from "../models/like.model.js";
+import {Comment} from "../models/comment.model.js";
+import {ApiError} from "../utils/ApiError.js";
+import {ApiResponse} from "../utils/ApiResponse.js";
+import {asyncHandler} from "../utils/asyncHandler.js";
+import {deleteFromCloudinary, uploadOnCloudinary} from "../utils/cloudinary.js";
 
 const getAllVideos = asyncHandler(async (req, res) => {
-    const { page = 1, limit = 10, query, sortBy, sortType, userId } = req.query
+    const { page = 1, limit = 10, query, sortBy, sortType, userId } = req.query;
     //TODO: get all videos based on query, sort, pagination
 
 })
 
 const publishAVideo = asyncHandler(async (req, res) => {
-    const { title, description} = req.body
+    const { title, description} = req.body;
     // get video, upload to cloudinary, create video
 
     if(!title) {
@@ -56,7 +58,7 @@ const publishAVideo = asyncHandler(async (req, res) => {
 })
 
 const getVideoById = asyncHandler(async (req, res) => {
-    const { videoId } = req.params
+    const { videoId } = req.params;
     // get video by id
 
     if(!videoId) {
@@ -173,6 +175,9 @@ const updateVideo = asyncHandler(async (req, res) => {
     if(!videoId) {
         throw new ApiError(403, "Give Video Id");
     }
+    if(!isValidObjectId(videoId)) {
+        throw new ApiError(403, "Invalid Video Id");
+    }
 
     const {title, description, thumbnail} = req.body;
 
@@ -189,12 +194,47 @@ const updateVideo = asyncHandler(async (req, res) => {
     return res.status(200)
         .json(new ApiResponse(200, updatedVideo, "Video Updated successfully."));
 
-
 })
 
 const deleteVideo = asyncHandler(async (req, res) => {
-    const { videoId } = req.params
+    const { videoId } = req.params;
     //TODO: delete video
+
+    if(!videoId) {
+        throw new ApiError(403, "Give Video Id");
+    }
+    if(!isValidObjectId(videoId)) {
+        throw new ApiError(403, "Invalid Video Id");
+    }
+
+    const video = Video.findById(videoId);
+    if(!video) {
+        throw new ApiError(403, "Video Not Found");
+    }
+
+    if(video?.owner.toString() !== req?.user._id.toString()) {
+        throw new ApiError(403, "You are not owner");
+    }
+
+    const thumbnailUrl = video.thumbnail;
+    const videoFileUrl = video.videoFile;
+
+    await video.deleteOne();
+
+    if(thumbnailUrl) await deleteFromCloudinary(thumbnailUrl);
+    if(videoFileUrl) await deleteFromCloudinary(videoFileUrl);
+
+    await Like.deleteMany({
+        video: videoId
+    });
+
+    await Comment.deleteMany({
+        video: videoId
+    });
+
+    res.status(200)
+        .json(new ApiResponse(200, {}, "Video Deleted successfully."));
+
 })
 
 const togglePublishStatus = asyncHandler(async (req, res) => {
