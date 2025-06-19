@@ -12,6 +12,76 @@ const getAllVideos = asyncHandler(async (req, res) => {
     const { page = 1, limit = 10, query, sortBy, sortType, userId } = req.query;
     //TODO: get all videos based on query, sort, pagination
 
+    // make a pipeline first than apply it
+    // operation will be on video model
+
+    const pipeline = [];
+
+    // check for words given as input in search
+    if(query) {
+        pipeline.push({
+            $search: {
+                index: "search-videos",
+                text: {
+                    query: query,
+                    path: ["title", "description"],
+                }
+            }
+        });
+    }
+
+    // check if it is needed from specific user
+    if(userId) {
+        if(!isValidObjectId(userId)) {
+            throw new ApiError(403, "Invalid User Id");
+        }
+        pipeline.push({
+            $match: {
+                owner: new mongoose.Types.ObjectId(userId)
+            }
+        })
+    }
+    // only give published videos
+    // pipeline.push({
+    //     $match: {
+    //         isPublished: true
+    //     }
+    // })
+
+    // join owner details
+    pipeline.push({
+        $lookup: {
+            from: "user",
+            localField: "owner",
+            foreignField: "_id",
+            as: "ownerDetails",
+            pipeline: [
+                {
+                    $project: {
+                        username: 1,
+                        "avatar.url": 1
+                    }
+                }
+            ]
+        }
+    },
+         // deconstruct the array field from doc and add doc.
+    {
+         $addFields: {
+             ownerDetails: { $arrayElemAt: ["$ownerDetails", 0] }
+         }
+    });
+
+    const videoAggregate = Video.aggregate(pipeline);
+    const options = {
+        page: parseInt(page, 10),
+        limit: parseInt(limit, 10)
+    }
+    const videos = await Video.aggregatePaginate(videoAggregate, options);
+
+    return res.status(200)
+        .json(200, videos, "Video Fetched Successfully");
+
 })
 
 const publishAVideo = asyncHandler(async (req, res) => {
@@ -44,7 +114,8 @@ const publishAVideo = asyncHandler(async (req, res) => {
         title: title,
         description: description,
         duration: videoRes.duration,
-        owner: req.user?._id
+        owner: req.user?._id,
+        isPublished:  true
     });
 
     const uploaded = await Video.findById(video._id);
@@ -237,9 +308,11 @@ const deleteVideo = asyncHandler(async (req, res) => {
 
 })
 
-const togglePublishStatus = asyncHandler(async (req, res) => {
-    const { videoId } = req.params
-})
+// const togglePublishStatus = asyncHandler(async (req, res) => {
+//     const { videoId } = req.params;
+//
+//
+// })
 
 export {
     getAllVideos,
@@ -247,5 +320,5 @@ export {
     getVideoById,
     updateVideo,
     deleteVideo,
-    togglePublishStatus
+    // togglePublishStatus
 }
