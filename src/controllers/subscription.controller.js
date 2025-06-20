@@ -106,11 +106,82 @@ const getUserChannelSubscribers = asyncHandler(async (req, res) => {
         }
     ]);
 
+    return res.status(200)
+        .json(new ApiResponse(200, subscribers, "Subscribers fetched successfully"));
+
 })
 
 // controller to return channel list to which user has subscribed
 const getSubscribedChannels = asyncHandler(async (req, res) => {
-    const { subscriberId } = req.params
+    const { subscriberId } = req.params;
+
+    if (!isValidObjectId(subscriberId)) {
+        throw new ApiError(400, "Invalid subscriberId");
+    }
+
+    await Subscription.aggregate([
+        {
+            $match: {
+                subscribe: new mongoose.Types.ObjectId(subscriberId)
+            }
+        },
+        {
+            $lookup: {
+                from: "user",
+                localField: "channel",
+                foreignField: "_id",
+                as: "subscribedChannels",
+                pipeline: [
+                    {
+                        $lookup: {
+                            from: "video",
+                            localField: "_id",
+                            foreignField: "owner",
+                            as: "videos",
+                            pipeline: [
+                                {
+                                    $sort: { createdAt: -1 }
+                                },
+                            ]
+                        }
+                    },
+                    {
+                        $addFields: {
+                            videos: { $size: "$videos" },
+                            latestVideo: {
+                                $arrayElemAt: ["$videos", 0]
+                            }
+                        }
+                    }
+                ]
+            }
+        },
+        {
+           $unwind: "subscribedChannels"
+        },
+        {
+            $project: {
+                _id: 0,
+                subscribedChannels: {
+                    _id: 1,
+                    username: 1,
+                    "avatar.url": 1,
+                    videos: 1,
+                    latestVideo: {
+                        "videoFile.url": 1,
+                        "thumbnail.url": 1,
+                        owner: 1,
+                        title: 1,
+                        duration: 1,
+                        createdAt: 1,
+                        views: 1,
+                    }
+                }
+            }
+        }
+    ]);
+
+
 })
 
 export {
